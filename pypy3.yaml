@@ -1,0 +1,66 @@
+package:
+# pypy needs a prebuilt pypy for best build times
+  name: pypy3
+  version: 7.3.10
+  epoch: 1
+  description: "JIT interpreter for python"
+  target-architecture:
+    - all
+  copyright:
+    - paths:
+      - "*"
+      attestation: TODO
+      license: MIT
+  dependencies:
+    runtime:
+    provides:
+      - pypy3-bootstrap=7.3.10
+
+environment:
+  contents:
+    packages:
+      - busybox
+      - ca-certificates-bundle
+      - build-base
+      - pypy3-bootstrap
+      - expat-dev
+      - bzip2-dev
+      - gdbm-dev
+      - openssl-dev
+      - libffi-dev
+      - zlib-dev
+      - ncurses-dev
+
+pipeline:
+  - assertions:
+      required-steps: 1
+    pipeline:
+      - uses: fetch
+        with:
+          uri: https://downloads.python.org/pypy/pypy3.9-v${{package.version}}-src.zip
+          expected-sha256: e3e2c41db0a5590d31233fd2909feeb83b1e7f997a473d74a11ad87ba4bbdc30
+  - runs: unzip pypy3.9-v${{package.version}}-src.zip
+  #PyPy wants to use their vendored dependencies when detecting linux.
+  #we'll patch it out.
+  - runs: |
+     cd pypy3.9-v${{package.version}}-src/pypy/goal
+     sed -i "s/, 'linux', 'linux2'//" targetpypystandalone.py
+     pypy ../../rpython/bin/rpython -Ojit --shared targetpypystandalone
+     PYTHONPATH=../.. ./pypy3.9-c ../../lib_pypy/pypy_tools/build_cffi_imports.py
+  
+  - runs: |
+      cd pypy3.9-v${{package.version}}-src/
+
+      pypy pypy/tool/release/package.py --archive-name pypy --targetdir .
+      mkdir unpacked
+      tar xf pypy.tar.bz2 -C unpacked
+
+      mkdir -p ${{targets.destdir}}/usr/bin ${{targets.destdir}}/usr/lib ${{targets.destdir}}/opt/pypy3
+      cp -r unpacked/pypy/* ${{targets.destdir}}/opt/pypy3
+
+      ln -s /opt/pypy3/bin/pypy3 ${{targets.destdir}}/usr/bin/pypy3
+      ln -s /opt/pypy3/bin/libpypy3-c.so ${{targets.destdir}}/usr/lib/libpypy3-c.so
+      
+      install -Dm644 README.rst ${{targets.destdir}}/opt/pypy3/README.rst
+      install -Dm644 LICENSE ${{targets.destdir}}/opt/pypy3/LICENSE
+  - uses: strip

@@ -1,0 +1,50 @@
+package:
+# pypy needs a prebuilt pypy for best build times
+  name: pypy3-bootstrap
+  version: 7.3.10
+  epoch: 0
+  description: "bootstrap package for pypy3"
+  target-architecture:
+    - all
+  copyright:
+    - paths:
+      - "*"
+      attestation: TODO
+      license: MIT
+  dependencies:
+    runtime:
+    provides:
+      - pypy3=7.3.10
+
+environment:
+  contents:
+    packages:
+      - busybox
+      - ca-certificates-bundle
+      - build-base
+
+pipeline:
+  - assertions:
+      required-steps: 1
+    pipeline:
+      - if: ${{build.arch}} == 'x86_64'
+        uses: fetch
+        with:
+          uri: https://downloads.python.org/pypy/pypy3.9-v${{package.version}}-linux64.tar.bz2
+          expected-sha256: 95cf99406179460d63ddbfe1ec870f889d05f7767ce81cef14b88a3a9e127266
+          extract: false
+      - if: ${{build.arch}} == 'aarch64'
+        uses: fetch
+        with:
+          uri: https://downloads.python.org/pypy/pypy3.9-v${{package.version}}-aarch64.tar.bz2
+          expected-sha256: 657a04fd9a5a992a2f116a9e7e9132ea0c578721f59139c9fb2083775f71e514
+          extract: false
+  - runs: tar -xjvf pypy3.9-v${{package.version}}-*.tar.bz2
+  - runs: |
+      mkdir -p ${{targets.destdir}}/opt/pypy3 
+      mkdir -p ${{targets.destdir}}/usr/bin 
+      mkdir -p ${{targets.destdir}}/usr/lib
+      cp -r pypy3.9-v${{package.version}}-*/* ${{targets.destdir}}/opt/pypy3/
+      ln -s ${{targets.destdir}}/opt/pypy3/bin/pypy3.9 ${{targets.destdir}}/usr/bin/pypy
+      ln -s ${{targets.destdir}}/opt/pypy3/bin/libpypy3.9-c.so ${{targets.destdir}}/usr/lib/
+  - uses: strip
